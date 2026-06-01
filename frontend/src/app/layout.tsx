@@ -1,8 +1,24 @@
 import type { Metadata } from "next";
+import { Outfit, Inter } from "next/font/google";
 import "../styles/globals.css";
 import Header from "../components/shared/Header";
 import Footer from "../components/shared/Footer";
 import { Providers } from "./providers";
+
+// Load Google Fonts natively via Next.js to eliminate hydration mismatch risk
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "EspressoLens | Intelligent Extraction Diagnostic Suite",
@@ -15,13 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
-      <body>
+    <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
+      <body className="min-h-screen flex flex-col font-sans">
         <Providers>
           <Header />
           <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
