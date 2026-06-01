@@ -28,6 +28,11 @@ class SearchResult(BaseModel):
     frame: ExtractionFrameRead
 
 
+class SearchRequest(BaseModel):
+    query_vector: List[float] = Field(..., description="512-dimensional query visual embedding vector")
+    limit: int = 5
+
+
 @router.post("/index-frame", response_model=ExtractionFrameRead, status_code=status.HTTP_201_CREATED)
 def index_extraction_frame(
     payload: FrameVectorPayload,
@@ -85,23 +90,22 @@ def index_extraction_frame(
 
 @router.post("/search-similar", response_model=List[SearchResult])
 def search_similar_frames(
-    query_vector: List[float] = Field(..., description="512-dimensional query visual embedding vector"),
-    limit: int = 5,
+    payload: SearchRequest,
     session: Session = Depends(SessionDep),
 ) -> List[SearchResult]:
     """Perform a semantic vector search in Qdrant for visually similar extraction runs or anomalies."""
-    if len(query_vector) != 512:
+    if len(payload.query_vector) != 512:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Query vector must be exactly 512 dimensions. Got {len(query_vector)}.",
+            detail=f"Query vector must be exactly 512 dimensions. Got {len(payload.query_vector)}.",
         )
 
     # 1. Search in Qdrant
     try:
         search_results = qdrant_client.search(
             collection_name=settings.QDRANT_COLLECTION,
-            query_vector=query_vector,
-            limit=limit,
+            query_vector=payload.query_vector,
+            limit=payload.limit,
         )
     except Exception as e:
         raise HTTPException(
