@@ -10,7 +10,7 @@ from app.api.v1.api import api_router
 
 
 @asynccontextmanager
-async lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):
     # Startup actions
     print("Initializing databases and vectors...")
     
