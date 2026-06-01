@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Coffee, Database, Eye, X, Cpu, Server, Activity, ShieldCheck } from "lucide-react";
+import { Coffee, Database, Eye, X, Cpu, Server, Activity, ShieldCheck, Sliders } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();
