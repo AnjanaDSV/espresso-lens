@@ -1,0 +1,19 @@
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package configuration files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy all files
+COPY . .
+
+# Expose Next.js server port
+EXPOSE 3000
+
+# Execute next dev server
+CMD ["npm", "run", "dev"]

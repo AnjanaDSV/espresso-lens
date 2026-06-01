@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-titanium-light antialiased overflow-x-hidden;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(127, 85, 57, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(212, 175, 55, 0.05) 0%, transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(11, 14, 20, 1) 0%, rgba(5, 7, 10, 1) 100%);
+    background-attachment: fixed;
+    font-family: 'Outfit', 'Inter', sans-serif;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-coffee-dark/50 rounded-full border border-background/20 transition-all duration-300;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-coffee/80;
+  }
+}
+
+@layer components {
+  /* Premium Glassmorphic Card class */
+  .glass-card {
+    @apply bg-background-card/65 backdrop-blur-md border border-white/5 rounded-2xl shadow-glass transition-all duration-500;
+  }
+  
+  .glass-card:hover {
+    @apply border-brass/25 shadow-glow bg-background-card/80;
+  }
+
+  /* Interactive Elements */
+  .btn-primary {
+    @apply relative px-5 py-2.5 rounded-xl font-medium overflow-hidden transition-all duration-300
+           bg-gradient-to-r from-coffee to-coffee-dark text-white border border-brass/30 shadow-md
+           hover:from-coffee-light hover:to-coffee hover:border-brass hover:shadow-glow active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply px-5 py-2.5 rounded-xl font-medium border border-white/10 text-titanium bg-white/5 transition-all duration-300
+           hover:bg-white/10 hover:text-white hover:border-white/20 active:scale-[0.98];
+  }
+
+  .btn-brass {
+    @apply px-5 py-2.5 rounded-xl font-medium border border-brass/50 text-brass bg-brass/5 transition-all duration-300
+           hover:bg-brass/10 hover:text-brass-light hover:border-brass active:scale-[0.98] shadow-glow;
+  }
+}

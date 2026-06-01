@@ -1,0 +1,61 @@
+# Dependencies
+**/node_modules/
+**/.pnp
+**/.pnp.js
+
+# Testing
+**/coverage/
+
+# Next.js
+**/.next/
+**/out/
+
+# Production build output
+**/build/
+**/dist/
+
+# Python envs and cache
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.venv/
+**/venv/
+**/ENV/
+**/env/
+**/.uv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Local database and volume data
+docker/data/
+**/qdrant_storage/
+pgdata/
+qdrant_data/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+pip-log.txt
+*.log
