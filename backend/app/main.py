@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from qdrant_client.errors import UnexpectedResponse
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.core.config import settings
 from app.core.database import init_db, engine

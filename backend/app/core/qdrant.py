@@ -1,6 +1,6 @@
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
-from qdrant_client.errors import UnexpectedResponse
+from qdrant_client.http.exceptions import UnexpectedResponse
 from app.core.config import settings
 
 # Initialize Qdrant Client
