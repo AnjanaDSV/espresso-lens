@@ -14,7 +14,8 @@ import {
   Tv,
   Check,
   Eye,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from "lucide-react";
 
 // Mock data representing database records we'd retrieve from PostgreSQL and Qdrant
@@ -53,6 +54,103 @@ const SEMANTIC_QUERIES = [
   }
 ];
 
+function getInterpretation(chSev: string, flowSt: string, crema: number): string {
+  const hasChanneling = chSev === "Detected";
+  const hasMild      = chSev === "Mild";
+  const hasFlow      = flowSt === "Uneven" || flowSt === "Restricted";
+  const hasLowCrema  = crema < 70;
+  const issueCount   = [hasChanneling || hasMild, hasFlow, hasLowCrema].filter(Boolean).length;
+
+  if (issueCount === 0)                                  return "Great shot! No significant issues detected.";
+  if (issueCount >= 2 && (hasChanneling || flowSt === "Restricted"))
+                                                         return "Multiple extraction issues found — see Brew Doctor below.";
+  if (issueCount >= 2)                                   return "Minor issues detected — shot is drinkable but could be improved.";
+  if (hasChanneling)                                     return "Channeling issue detected — check your tamp and distribution.";
+  if (hasMild)                                           return "Mild channeling detected — redistribute before tamping.";
+  if (hasFlow)                                           return "Uneven flow detected — check your tamp angle and distribution.";
+  if (hasLowCrema)                                       return "Shot pulled but crema is thin — check bean freshness and grind.";
+  return "Shot analyzed successfully.";
+}
+
+function getRemediationAdvice(result: any) {
+  const crema = Math.round((result.crema_quality_rating ?? 0) * 100);
+  const tips: { title: string; items: string[]; borderBg: string; textColor: string; dotBg: string }[] = [];
+
+  const chSeverity: string = result.channeling_severity ?? (result.detected_channeling ? "Detected" : "None");
+
+  if (chSeverity === "Detected") {
+    tips.push({
+      title: "Channeling Detected",
+      borderBg: "border-accent-red/30 bg-accent-red/5",
+      textColor: "text-accent-red",
+      dotBg: "bg-accent-red/70",
+      items: [
+        "Distribute grounds more evenly before tamping",
+        "Check your tamp pressure — aim for 30 lbs even pressure",
+        "Try a WDT tool (Weiss Distribution Technique)",
+        "Grind coarser if channeling persists",
+      ],
+    });
+  } else if (chSeverity === "Mild") {
+    tips.push({
+      title: "Mild Channeling",
+      borderBg: "border-accent-amber/30 bg-accent-amber/5",
+      textColor: "text-accent-amber",
+      dotBg: "bg-accent-amber/70",
+      items: [
+        "Minor puck unevenness detected — redistribution before tamping will help",
+        "Check tamp levelness with a distribution tool",
+        "Slightly coarser grind can reduce surface turbulence",
+      ],
+    });
+  }
+
+  const flowStatus: string = result.flow_status ?? (result.detected_uneven_flow ? "Uneven" : "Balanced");
+
+  if (flowStatus === "Restricted") {
+    tips.push({
+      title: "Restricted Flow",
+      borderBg: "border-accent-red/30 bg-accent-red/5",
+      textColor: "text-accent-red",
+      dotBg: "bg-accent-red/70",
+      items: [
+        "Grind significantly coarser — puck is choking the flow",
+        "Check portafilter basket for blockages or clogs",
+        "Reduce dose weight slightly and re-tamp evenly",
+        "Descale your machine if flow restriction persists",
+      ],
+    });
+  } else if (flowStatus === "Uneven") {
+    tips.push({
+      title: "Uneven Flow",
+      borderBg: "border-accent-amber/30 bg-accent-amber/5",
+      textColor: "text-accent-amber",
+      dotBg: "bg-accent-amber/70",
+      items: [
+        "Distribute grounds more evenly — try a WDT tool before tamping",
+        "Check tamp angle — uneven tamp causes uneven flow paths",
+        "Adjust grind size if one side consistently runs faster",
+      ],
+    });
+  }
+
+  if (crema < 70) {
+    tips.push({
+      title: "Low Crema Coverage",
+      borderBg: "border-brass/30 bg-brass/5",
+      textColor: "text-brass",
+      dotBg: "bg-brass/70",
+      items: [
+        "Beans may be too old — use within 2–4 weeks of roast",
+        "Try a slightly finer grind",
+        "Check water temperature (target 93–96°C)",
+      ],
+    });
+  }
+
+  return { perfect: tips.length === 0, tips };
+}
+
 const SAMPLE_IMAGES = [
   { label: "Perfect Shot",       filename: "perfect_shot.jpg",      dotClass: "bg-accent-green" },
   { label: "Channeling",         filename: "channeling_severe.jpg", dotClass: "bg-accent-red"   },
@@ -74,12 +172,21 @@ export default function Dashboard() {
   const [uploadResult, setUploadResult] = useState<any | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [loadingSample, setLoadingSample] = useState<string | null>(null);
+  const [loadedSampleLabel, setLoadedSampleLabel] = useState<string | null>(null);
+  const [analyzedSource, setAnalyzedSource] = useState<string | null>(null);
+  const [brewDoctorOpen, setBrewDoctorOpen] = useState(true);
+
+  const advice = uploadResult ? getRemediationAdvice(uploadResult) : null;
 
   const handleUpload = async () => {
     if (!uploadedFile) return;
     setIsUploading(true);
     setUploadError(null);
     setUploadResult(null);
+    setAnalyzedSource(null);
+    const sourceName = loadedSampleLabel
+      ? `${loadedSampleLabel} (sample)`
+      : uploadedFile.name;
 
     const formData = new FormData();
     formData.append("file", uploadedFile);
@@ -96,6 +203,7 @@ export default function Dashboard() {
       }
       const data = await res.json();
       setUploadResult(data[0]);
+      setAnalyzedSource(sourceName);
       setUploadedFile(null);
     } catch (e: any) {
       setUploadError(e.message);
@@ -122,6 +230,7 @@ export default function Dashboard() {
       if (!res.ok) throw new Error("Sample not found — run scripts/generate_test_images.py first");
       const blob = await res.blob();
       setUploadedFile(new File([blob], sample.filename, { type: "image/jpeg" }));
+      setLoadedSampleLabel(sample.label);
     } catch (e: any) {
       setUploadError(e.message);
     } finally {
@@ -158,7 +267,7 @@ export default function Dashboard() {
             e.preventDefault();
             setDragOver(false);
             const file = e.dataTransfer.files[0];
-            if (file) { setUploadedFile(file); setUploadResult(null); setUploadError(null); }
+            if (file) { setUploadedFile(file); setUploadResult(null); setUploadError(null); setLoadedSampleLabel(null); setAnalyzedSource(null); }
           }}
         >
           <UploadCloud className={`w-10 h-10 mx-auto mb-3 transition-colors duration-300 ${dragOver ? "text-brass" : "text-brass/50"}`} />
@@ -180,7 +289,7 @@ export default function Dashboard() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) { setUploadedFile(file); setUploadResult(null); setUploadError(null); }
+                  if (file) { setUploadedFile(file); setUploadResult(null); setUploadError(null); setLoadedSampleLabel(null); setAnalyzedSource(null); }
                 }}
               />
             </label>
@@ -195,7 +304,7 @@ export default function Dashboard() {
                   Analyze with AI
                 </button>
                 <button
-                  onClick={() => { setUploadedFile(null); setUploadError(null); }}
+                  onClick={() => { setUploadedFile(null); setUploadError(null); setLoadedSampleLabel(null); setAnalyzedSource(null); }}
                   className="text-xs text-titanium hover:text-white transition"
                 >
                   Clear
@@ -249,34 +358,108 @@ export default function Dashboard() {
 
         {/* Upload result */}
         {uploadResult && (
-          <div className="mt-3 p-4 rounded-xl bg-background/70 border border-accent-green/20 space-y-2.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-accent-green">
-              <CheckCircle className="w-4 h-4" />
-              Frame indexed successfully
+          <>
+            {analyzedSource && (
+              <p className="mt-3 mb-1 text-[11px] px-0.5 text-titanium/60">
+                Analyzing: <span className="text-brass/80 font-medium">{analyzedSource}</span>
+              </p>
+            )}
+            <div className={`${analyzedSource ? "mt-1" : "mt-3"} p-4 rounded-xl bg-background/70 border border-accent-green/20 space-y-2.5`}>
+              <div className="flex items-center gap-2 text-xs font-semibold text-accent-green">
+                <CheckCircle className="w-4 h-4" />
+                Frame indexed successfully
+              </div>
+              {(() => {
+                const chSev: string = uploadResult.channeling_severity ?? (uploadResult.detected_channeling ? "Detected" : "None");
+                const flowSt: string = uploadResult.flow_status ?? (uploadResult.detected_uneven_flow ? "Uneven" : "Balanced");
+                const crema = Math.round((uploadResult.crema_quality_rating ?? 0) * 100);
+                const conf  = Math.round((uploadResult.detection_confidence ?? 0.5) * 100);
+                const chColor  = chSev === "Detected" ? "text-accent-red" : chSev === "Mild" ? "text-accent-amber" : "text-accent-green";
+                const flColor  = flowSt === "Uneven" ? "text-accent-amber" : flowSt === "Restricted" ? "text-accent-red" : "text-accent-green";
+                const confColor = conf >= 75 ? "text-accent-green" : conf >= 50 ? "text-accent-amber" : "text-titanium";
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                      <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
+                        <span className="text-titanium text-[10px]">Channeling</span>
+                        <p className={`font-bold mt-0.5 ${chColor}`}>{chSev}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
+                        <span className="text-titanium text-[10px]">Flow</span>
+                        <p className={`font-bold mt-0.5 ${flColor}`}>{flowSt}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
+                        <span className="text-titanium text-[10px]">Crema</span>
+                        <p className="font-bold text-brass mt-0.5">{crema}%</p>
+                      </div>
+                      <div
+                        className="p-2 rounded-lg bg-background border border-white/5 text-center cursor-help"
+                        title="How certain the AI is about this reading"
+                      >
+                        <span className="text-titanium text-[10px] flex items-center justify-center gap-0.5">
+                          Confidence <Info className="w-2.5 h-2.5 text-titanium/40" />
+                        </span>
+                        <p className={`font-bold mt-0.5 ${confColor}`}>{conf}%</p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-brass/65 italic">
+                      {getInterpretation(chSev, flowSt, crema)}
+                    </p>
+                  </>
+                );
+              })()}
+              <p className="text-[10px] text-titanium truncate" title={uploadResult.qdrant_point_id}>
+                Qdrant ID: {uploadResult.qdrant_point_id}
+              </p>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
-                <span className="text-titanium text-[10px]">Channeling</span>
-                <p className={`font-bold mt-0.5 ${uploadResult.detected_channeling ? "text-accent-red" : "text-accent-green"}`}>
-                  {uploadResult.detected_channeling ? "Detected" : "None"}
-                </p>
+          </>
+        )}
+
+        {/* Brew Doctor — remediation guide */}
+        {advice && (
+          <div className="mt-3 rounded-xl border border-accent-green/25 bg-accent-green/5 overflow-hidden">
+            <button
+              onClick={() => setBrewDoctorOpen((o: boolean) => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent-green/5 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-xs font-bold text-accent-green">
+                <span>🩺</span> Brew Doctor
+                {advice.perfect && (
+                  <span className="text-[10px] font-medium text-accent-green/70 ml-0.5">— All Clear</span>
+                )}
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 text-accent-green/50 transition-transform duration-200 ${brewDoctorOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {brewDoctorOpen && (
+              <div className="px-4 pb-4 space-y-3">
+                {advice.perfect ? (
+                  <div className="p-4 rounded-lg bg-accent-green/10 border border-accent-green/20 text-center space-y-1.5">
+                    <p className="text-xl">🎉</p>
+                    <p className="text-xs font-bold text-accent-green">Your extraction looks great!</p>
+                    <p className="text-[11px] text-titanium leading-relaxed">
+                      Note your grind size and dose for next time so you can reproduce this shot.
+                    </p>
+                  </div>
+                ) : (
+                  advice.tips.map((tip, i) => (
+                    <div key={i} className={`p-3 rounded-lg border ${tip.borderBg}`}>
+                      <p className={`text-[11px] font-bold mb-2 ${tip.textColor}`}>{tip.title}</p>
+                      <ul className="space-y-1.5">
+                        {tip.items.map((item, j) => (
+                          <li key={j} className="flex items-start gap-2 text-[11px] text-titanium leading-snug">
+                            <span className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${tip.dotBg}`} />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                )}
               </div>
-              <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
-                <span className="text-titanium text-[10px]">Flow</span>
-                <p className={`font-bold mt-0.5 ${uploadResult.detected_uneven_flow ? "text-accent-amber" : "text-accent-green"}`}>
-                  {uploadResult.detected_uneven_flow ? "Uneven" : "Balanced"}
-                </p>
-              </div>
-              <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
-                <span className="text-titanium text-[10px]">Crema</span>
-                <p className="font-bold text-brass mt-0.5">
-                  {Math.round((uploadResult.crema_quality_rating ?? 0) * 100)}%
-                </p>
-              </div>
-            </div>
-            <p className="text-[10px] text-titanium truncate" title={uploadResult.qdrant_point_id}>
-              Qdrant ID: {uploadResult.qdrant_point_id}
-            </p>
+            )}
           </div>
         )}
       </section>
