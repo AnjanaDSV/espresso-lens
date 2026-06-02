@@ -1,5 +1,8 @@
+import os
+import uuid
+import shutil
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlmodel import Session, select
 from app.api.deps import SessionDep
 from app.models.extraction import Extraction, ExtractionCreate, ExtractionRead
@@ -117,3 +120,65 @@ def process_extraction_video(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Video frame analysis processing failed: {str(e)}",
         )
+
+
+_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+@router.post("/{extraction_id}/upload-file", response_model=List[ExtractionFrameRead])
+def upload_extraction_file(
+    extraction_id: int,
+    file: UploadFile = File(...),
+    session: Session = Depends(SessionDep),
+) -> List[ExtractionFrame]:
+    """Upload an extraction video or static image file.
+
+    Images are decoded in-memory — no temp file is written. The raw bytes are
+    passed directly to the embedding pipeline, which generates a 512-dimension
+    vector, upserts it to Qdrant, and saves the frame log to PostgreSQL.
+
+    Videos are saved to a temporary path and processed frame-by-frame via OpenCV.
+    """
+    content_type = (file.content_type or "").lower()
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    is_image = content_type in _IMAGE_CONTENT_TYPES or ext in _IMAGE_EXTENSIONS
+
+    if is_image:
+        try:
+            image_bytes = file.file.read()
+            from app.services.video_processor import process_image_bytes
+            return process_image_bytes(
+                image_bytes=image_bytes,
+                session=session,
+                filename=file.filename or "upload",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Image embedding pipeline failed: {str(e)}",
+            )
+
+    # --- Video path: save to temp file, run OpenCV frame-splitting loop ---
+    temp_dir = os.path.join(os.path.dirname(__file__), "../../../../temp_uploads")
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file.filename}")
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        from app.services.video_processor import process_video_file
+        return process_video_file(
+            extraction_id=extraction_id,
+            video_path=file_path,
+            session=session,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Video frame analysis pipeline failed: {str(e)}",
+        )
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)

@@ -60,6 +60,40 @@ export default function Dashboard() {
   const [customVectorInput, setCustomVectorInput] = useState("");
   const [vectorResults, setVectorResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<any | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleUpload = async () => {
+    if (!uploadedFile) return;
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadResult(null);
+
+    const formData = new FormData();
+    formData.append("file", uploadedFile);
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    try {
+      const res = await fetch(
+        `${apiBase}/api/v1/extractions/${selectedExtraction.id}/upload-file`,
+        { method: "POST", body: formData }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Upload failed (${res.status})`);
+      }
+      const data = await res.json();
+      setUploadResult(data[0]);
+      setUploadedFile(null);
+    } catch (e: any) {
+      setUploadError(e.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSemanticSearch = (index: number) => {
     setIsSearching(true);
@@ -86,6 +120,115 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Upload Drop Zone */}
+      <section className="glass-card p-5 relative overflow-hidden">
+        {/* Drop target */}
+        <div
+          className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+            dragOver ? "border-brass/60 bg-brass/5" : "border-white/10 hover:border-white/20"
+          }`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files[0];
+            if (file) { setUploadedFile(file); setUploadResult(null); setUploadError(null); }
+          }}
+        >
+          <UploadCloud className={`w-10 h-10 mx-auto mb-3 transition-colors duration-300 ${dragOver ? "text-brass" : "text-brass/50"}`} />
+          <p className="text-white font-semibold text-sm">
+            {uploadedFile ? uploadedFile.name : "Drop an extraction video or image here"}
+          </p>
+          <p className="text-titanium text-xs mt-1">
+            {uploadedFile
+              ? `${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB · ${uploadedFile.type || "unknown type"}`
+              : "Supports MP4, MOV, JPG, JPEG, PNG and more"}
+          </p>
+
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <label className="inline-block cursor-pointer">
+              <span className="btn-brass py-1.5 px-4 text-xs font-semibold">Browse files</span>
+              <input
+                type="file"
+                accept="video/*,image/*,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) { setUploadedFile(file); setUploadResult(null); setUploadError(null); }
+                }}
+              />
+            </label>
+
+            {uploadedFile && !isUploading && (
+              <>
+                <button
+                  onClick={handleUpload}
+                  className="flex items-center gap-1.5 bg-coffee border border-brass/40 text-white text-xs font-semibold py-1.5 px-4 rounded-lg hover:bg-coffee-light hover:border-brass transition-all duration-300"
+                >
+                  <Check className="w-3.5 h-3.5 text-brass" />
+                  Analyze with AI
+                </button>
+                <button
+                  onClick={() => { setUploadedFile(null); setUploadError(null); }}
+                  className="text-xs text-titanium hover:text-white transition"
+                >
+                  Clear
+                </button>
+              </>
+            )}
+
+            {isUploading && (
+              <span className="flex items-center gap-1.5 text-xs text-brass font-medium">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                Uploading & embedding…
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Upload error */}
+        {uploadError && (
+          <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-accent-red/10 border border-accent-red/20 text-xs text-accent-red">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{uploadError}</span>
+          </div>
+        )}
+
+        {/* Upload result */}
+        {uploadResult && (
+          <div className="mt-3 p-4 rounded-xl bg-background/70 border border-accent-green/20 space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-accent-green">
+              <CheckCircle className="w-4 h-4" />
+              Frame indexed successfully
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
+                <span className="text-titanium text-[10px]">Channeling</span>
+                <p className={`font-bold mt-0.5 ${uploadResult.detected_channeling ? "text-accent-red" : "text-accent-green"}`}>
+                  {uploadResult.detected_channeling ? "Detected" : "None"}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
+                <span className="text-titanium text-[10px]">Flow</span>
+                <p className={`font-bold mt-0.5 ${uploadResult.detected_uneven_flow ? "text-accent-amber" : "text-accent-green"}`}>
+                  {uploadResult.detected_uneven_flow ? "Uneven" : "Balanced"}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-background border border-white/5 text-center">
+                <span className="text-titanium text-[10px]">Crema</span>
+                <p className="font-bold text-brass mt-0.5">
+                  {Math.round((uploadResult.crema_quality_rating ?? 0) * 100)}%
+                </p>
+              </div>
+            </div>
+            <p className="text-[10px] text-titanium truncate" title={uploadResult.qdrant_point_id}>
+              Qdrant ID: {uploadResult.qdrant_point_id}
+            </p>
+          </div>
+        )}
+      </section>
+
       {/* Hero Section */}
       <section className="glass-card p-6 md:p-8 relative overflow-hidden">
         {/* Decorative corner glows */}

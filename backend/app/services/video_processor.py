@@ -1,8 +1,8 @@
 import os
 import uuid
 import math
-from typing import List
-from sqlmodel import Session
+from typing import List, Optional
+from sqlmodel import Session, select
 from qdrant_client.http import models as qmodels
 
 # OpenCV is used for frame extraction and computer vision features
@@ -10,6 +10,8 @@ import cv2
 
 from app.core.config import settings
 from app.core.qdrant import qdrant_client
+from app.models.bean import Bean
+from app.models.extraction import Extraction
 from app.models.frame import ExtractionFrame
 
 
@@ -133,6 +135,94 @@ def analyze_extraction_frame_quality(frame):
     return detected_channeling, detected_uneven_flow, crema_quality_rating
 
 
+def process_image_bytes(
+    image_bytes: bytes,
+    session: Session,
+    filename: str = "uploaded_image",
+    bean_id: Optional[int] = None,
+) -> List[ExtractionFrame]:
+    """Decode a static image from raw bytes, embed it, and persist results.
+
+    Creates a new parent Extraction row first (using the provided bean_id or the
+    first available bean), commits it to obtain a real database-backed ID, then
+    decodes the image in-memory via cv2.imdecode and runs the full embedding and
+    storage pipeline on the single resulting frame.
+    """
+    import numpy as np
+
+    # 0. Ensure a valid parent Extraction record exists before writing the child frame.
+    #    Resolve bean_id: use the caller-supplied value or fall back to the first bean.
+    if bean_id is None:
+        first_bean = session.exec(select(Bean).limit(1)).first()
+        if first_bean is None:
+            raise ValueError(
+                "No bean profiles found in the database. "
+                "Please add a coffee bean before uploading an image."
+            )
+        bean_id = first_bean.id
+
+    db_extraction = Extraction(
+        bean_id=bean_id,
+        dose_in_grams=0.0,
+        yield_in_grams=0.0,
+        extraction_time_seconds=0.0,
+        notes=f"Auto-generated extraction record for image upload: {filename}",
+    )
+    session.add(db_extraction)
+    session.commit()
+    session.refresh(db_extraction)
+    extraction_id = db_extraction.id
+
+    # 1. Decode image in-memory
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise IOError(f"Could not decode image bytes for: {filename}")
+
+    # 2. Classify channeling and flow metrics
+    channeling, uneven_flow, crema_rating = analyze_extraction_frame_quality(frame)
+
+    # 3. Generate 512-dimension embedding vector
+    vector = generate_mock_vision_embeddings(frame)
+
+    # 4. Upsert vector point to Qdrant collection
+    point_id = str(uuid.uuid4())
+    try:
+        qdrant_client.upsert(
+            collection_name=settings.QDRANT_COLLECTION,
+            points=[
+                qmodels.PointStruct(
+                    id=point_id,
+                    vector=vector,
+                    payload={
+                        "extraction_id": extraction_id,
+                        "timestamp_seconds": 0.0,
+                        "detected_channeling": channeling,
+                        "detected_uneven_flow": uneven_flow,
+                        "crema_quality_rating": crema_rating,
+                    },
+                )
+            ],
+        )
+    except Exception as qd_err:
+        print(f"Warning: Failed to index image vector in Qdrant: {qd_err}")
+
+    # 5. Persist frame record in PostgreSQL via SQLModel
+    db_frame = ExtractionFrame(
+        extraction_id=extraction_id,
+        timestamp_seconds=0.0,
+        qdrant_point_id=point_id,
+        detected_channeling=channeling,
+        detected_uneven_flow=uneven_flow,
+        crema_quality_rating=crema_rating,
+        notes=f"Processed static image: {filename}",
+    )
+    session.add(db_frame)
+    session.commit()
+    session.refresh(db_frame)
+    return [db_frame]
+
+
 def process_video_file(
     extraction_id: int,
     video_path: str,
@@ -145,6 +235,57 @@ def process_video_file(
     """
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found at: {video_path}")
+
+    # Check if the file is a static image rather than a video stream
+    ext = os.path.splitext(video_path)[1].lower()
+    if ext in [".jpg", ".jpeg", ".png"]:
+        frame = cv2.imread(video_path)
+        if frame is None:
+            raise IOError(f"Could not read image file: {video_path}")
+
+        # 1. Classify channeling and flow metrics from image
+        channeling, uneven_flow, crema_rating = analyze_extraction_frame_quality(frame)
+
+        # 2. Extract 512-dimension visual embedding vector
+        vector = generate_mock_vision_embeddings(frame)
+
+        # 3. Upsert to Qdrant collection
+        point_id = str(uuid.uuid4())
+        try:
+            qdrant_client.upsert(
+                collection_name=settings.QDRANT_COLLECTION,
+                points=[
+                    qmodels.PointStruct(
+                        id=point_id,
+                        vector=vector,
+                        payload={
+                            "extraction_id": extraction_id,
+                            "timestamp_seconds": 0.0,
+                            "detected_channeling": channeling,
+                            "detected_uneven_flow": uneven_flow,
+                            "crema_quality_rating": crema_rating,
+                        }
+                    )
+                ]
+            )
+        except Exception as qd_err:
+            print(f"Warning: Failed to index vector in Qdrant: {qd_err}")
+
+        # 4. Save metadata record to PostgreSQL via SQLModel
+        db_frame = ExtractionFrame(
+            extraction_id=extraction_id,
+            timestamp_seconds=0.0,
+            qdrant_point_id=point_id,
+            detected_channeling=channeling,
+            detected_uneven_flow=uneven_flow,
+            crema_quality_rating=crema_rating,
+            notes=f"Processed static image file: {os.path.basename(video_path)}"
+        )
+
+        session.add(db_frame)
+        session.commit()
+        session.refresh(db_frame)
+        return [db_frame]
         
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():

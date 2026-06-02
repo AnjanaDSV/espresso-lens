@@ -1,41 +1,97 @@
-# EspressoLens ☕🔍
+# EspressoLens
 
-EspressoLens is an intelligent, high-end multi-repo workspace designed to perform semantic retrieval and analysis over **espresso extraction video frames** linked to detailed **coffee bean profiles**. It aids home baristas and commercial operators in diagnosing shot quality defects (such as channeling, uneven flow, and crema issues) using state-of-the-art vision embeddings.
+EspressoLens is an intelligent espresso extraction diagnostic suite. It analyzes espresso shot videos and images frame-by-frame using computer vision and vector embeddings to detect shot defects — channeling, uneven flow, and crema quality issues — and enables semantic search across historical brews.
 
-## Tech Stack & Architecture
-
-- **Frontend**: Next.js (App Router, TypeScript, Tailwind CSS) styled beautifully with `shadcn/ui` components for an immersive, premium UX.
-- **Backend**: FastAPI (Python 3.11/3.12) utilizing `SQLModel` (unified SQL databases & Pydantic validation) for streamlined DB interaction.
-- **Dependency Management**: Powered by `uv` for ultra-fast, robust package installation and environment builds.
-- **Databases**:
-  - **PostgreSQL**: Relational storage for structured records: bean metadata, extraction runs, and analytical parameters.
-  - **Qdrant Vector Database**: Vector storage indexing visual frames from extraction videos for high-dimensional semantic search.
-- **Orchestration**: Fully dockerized with multi-service synchronization via `docker-compose.yml`.
+Built for home baristas and commercial operators who want data-driven feedback on their extraction technique.
 
 ---
 
-## Directory Structure
+## Features
+
+- **Video & Image Upload** — Drag-and-drop upload of espresso shot recordings or stills
+- **Frame-by-Frame Analysis** — OpenCV-powered processing extracts frames and computes visual metrics per frame
+- **Defect Detection** — Identifies channeling, uneven flow patterns, and crema quality rating (0–1 scale)
+- **Vector Embeddings** — Each analyzed frame is encoded into a 512-dimensional L2-normalized embedding and indexed in Qdrant
+- **Semantic Search** — Query across extraction history by visual similarity (e.g. "strong channeling", "tiger-stripe crema")
+- **Bean Database** — Catalog of coffee bean profiles with roast level, origin, tasting notes, and target parameters
+- **Extraction Logs** — Full history of extraction runs with dose, yield, time, pressure profile, and diagnostic status
+- **AI Pipeline Inspector** — Interactive modal showing CLIP ViT-B/32 pipeline specs and Qdrant vector collection config
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, Framer Motion |
+| Backend | FastAPI, Python 3.11+, SQLModel (SQLAlchemy + Pydantic) |
+| Relational DB | PostgreSQL 16 |
+| Vector DB | Qdrant (512-dim cosine similarity) |
+| Vision | OpenCV (`opencv-python-headless`), CLIP ViT-B/32 architecture |
+| Dependency Mgmt | `uv` (Python), npm (Node) |
+| Orchestration | Docker & Docker Compose |
+
+---
+
+## Architecture
 
 ```
 espresso-lens/
-├── .gitignore
-├── README.md
 ├── docker-compose.yml
-├── backend/                  # FastAPI + SQLModel + Qdrant Client + uv
-│   ├── app/
-│   │   ├── api/              # Endpoints (extractions, beans, semantic search)
-│   │   ├── core/             # Base configurations, Database and Qdrant connectors
-│   │   ├── models/           # SQLModel data models
-│   │   └── main.py           # Application entrypoint
-│   └── Dockerfile.dev        # Fast reload Python container
-└── frontend/                 # Next.js App Router + TypeScript + Tailwind
-    ├── src/
-    │   ├── app/              # Dashboard pages and layout
-    │   ├── components/       # Visual components and UI widgets
-    │   ├── lib/              # Client-side API hooks and utility functions
-    │   └── styles/           # Tailwind globals
-    └── Dockerfile.dev        # Next.js hot-reload development container
+├── backend/
+│   ├── Dockerfile.dev
+│   └── app/
+│       ├── main.py                  # FastAPI entrypoint
+│       ├── api/v1/endpoints/        # extractions, beans, search routes
+│       ├── core/                    # DB and Qdrant connectors, config
+│       ├── models/                  # SQLModel table definitions
+│       └── services/
+│           └── video_processor.py   # OpenCV frame extraction + embedding
+└── frontend/
+    ├── Dockerfile.dev
+    └── src/
+        ├── app/                     # Next.js App Router pages
+        │   ├── page.tsx             # Main dashboard
+        │   ├── extraction-logs/     # Extraction history table
+        │   └── bean-database/       # Bean catalog management
+        └── components/
+            └── shared/
+                └── Header.tsx       # Nav + AI pipeline modals
 ```
+
+### Data Models
+
+**Bean** — Coffee profiles (name, roaster, roast level, origin, notes)
+
+**Extraction** — Shot runs linked to a Bean (dose, yield, time, temperature, pressure profile, rating, video path)
+
+**ExtractionFrame** — Per-frame analysis results linked to an Extraction (timestamp, channeling detected, uneven flow detected, crema rating, Qdrant point ID)
+
+**Qdrant Points** — 512-dim L2-normalized vectors with payload metadata (extraction ID, defect flags, crema rating) stored in the `espresso_extraction_frames` collection using cosine distance.
+
+---
+
+## API Endpoints
+
+Base URL: `http://localhost:8000/api/v1`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | PostgreSQL + Qdrant connectivity check |
+| `POST` | `/beans/` | Create bean profile |
+| `GET` | `/beans/` | List all beans |
+| `GET` | `/beans/{id}` | Get bean by ID |
+| `POST` | `/extractions/` | Log new extraction run |
+| `GET` | `/extractions/` | List all extractions |
+| `GET` | `/extractions/{id}` | Get extraction by ID |
+| `POST` | `/extractions/{id}/upload-file` | Upload video or image file |
+| `POST` | `/extractions/{id}/process-video` | Trigger OpenCV frame processing |
+| `POST` | `/extractions/{id}/frames` | Add analyzed frame record |
+| `GET` | `/extractions/{id}/frames` | List frames for extraction |
+| `POST` | `/search/index-frame` | Index frame embedding in Qdrant |
+| `POST` | `/search/search-similar` | Semantic vector similarity search |
+
+Interactive API docs: `http://localhost:8000/docs`
 
 ---
 
@@ -43,27 +99,76 @@ espresso-lens/
 
 ### Prerequisites
 
-Make sure you have the following installed locally:
-- [Docker & Docker Compose](https://www.docker.com/products/docker-desktop/)
-- [Node.js](https://nodejs.org/) (optional, for local development outside containers)
-- [Python 3.11+](https://www.python.org/) and [uv](https://github.com/astral-sh/uv) (optional, for local backend tooling)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
+- Git
 
-### Running the Complete Stack
+For local development outside Docker:
+- Node.js 18+
+- Python 3.11+ and [uv](https://github.com/astral-sh/uv)
 
-To boot up all services (Next.js, FastAPI, PostgreSQL, and Qdrant) in coordinated containers:
+### Run with Docker
 
 ```bash
+git clone https://github.com/AnjanaDSV/espresso-lens.git
+cd espresso-lens
 docker compose up --build
 ```
 
-Once all containers are running and healthy, you can access the respective interfaces:
-- **Frontend Dashboard**: [http://localhost:3000](http://localhost:3000)
-- **FastAPI OpenAPI Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Qdrant Vector Console Dashboard**: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
-- **PostgreSQL**: Standard endpoint at `localhost:5432`
+All four services start with coordinated health checks. Once healthy:
+
+| Service | URL |
+|---|---|
+| Frontend Dashboard | http://localhost:3000 |
+| FastAPI Docs | http://localhost:8000/docs |
+| Qdrant Dashboard | http://localhost:6333/dashboard |
+| PostgreSQL | localhost:5432 |
+
+### Local Development (without Docker)
+
+**Backend:**
+```bash
+cd backend
+uv pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Environment Variables
+
+**Backend** — create `backend/.env`:
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/espressolens
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+QDRANT_COLLECTION=espresso_extraction_frames
+ENVIRONMENT=development
+```
+
+**Frontend** — create `frontend/.env.local`:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+WATCHPACK_POLLING=true
+```
+
+---
+
+## Docker Services
+
+| Service | Image | Ports | Notes |
+|---|---|---|---|
+| `db` | postgres:16-alpine | 5432 | Persistent volume, health-checked |
+| `qdrant` | qdrant/qdrant:latest | 6333, 6334 | Persistent volume |
+| `backend` | python:3.11-slim (custom) | 8000 | Hot-reload via volume mount |
+| `frontend` | node:18-alpine (custom) | 3000 | Hot-reload via volume mount, depends on backend |
 
 ---
 
 ## License
 
-This project is licensed under the MIT License.
+MIT

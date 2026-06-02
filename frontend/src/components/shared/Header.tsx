@@ -3,11 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Coffee, Database, Eye, X, Cpu, Server, Activity, ShieldCheck, Sliders } from "lucide-react";
+import { Coffee, Database, Eye, X, Cpu, Server, Activity, ShieldCheck, Sliders, HardDrive, CheckCircle2 } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();
   const [isClipModalOpen, setIsClipModalOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const isLinkActive = (path: string) => {
     return pathname === path;
@@ -69,10 +70,16 @@ export default function Header() {
               <Eye className="w-3.5 h-3.5 animate-pulse text-brass" />
               <span>CLIP Vision</span>
             </button>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-coffee-deep border border-brass/10 text-xs text-brass font-medium">
-              <Database className="w-3.5 h-3.5" />
+
+            {/* Interactive Qdrant Active Button */}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-coffee-deep border border-brass/30 text-xs text-brass font-medium hover:bg-coffee/35 hover:border-brass hover:shadow-glow transition-all duration-300 active:scale-[0.97]"
+              title="Click to view Qdrant Database diagnostics"
+            >
+              <Database className="w-3.5 h-3.5 animate-pulse text-brass" />
               <span>Qdrant Active</span>
-            </div>
+            </button>
           </div>
         </div>
       </header>
@@ -85,9 +92,8 @@ export default function Header() {
         >
           <div 
             className="glass-card w-full max-w-md p-6 relative bg-background-card/95 border border-white/10 shadow-glass animate-scaleUp"
-            onClick={(e) => e.stopPropagation()} // Prevent click-outside closure when clicking inside the card
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
             <button
               onClick={() => setIsClipModalOpen(false)}
               className="absolute top-4 right-4 text-titanium hover:text-white transition"
@@ -95,7 +101,6 @@ export default function Header() {
               <X className="w-5 h-5" />
             </button>
 
-            {/* Modal Header */}
             <div className="flex items-center gap-2.5 border-b border-white/5 pb-3.5 mb-5">
               <div className="bg-brass/10 p-2 rounded-lg border border-brass/30">
                 <Eye className="w-5 h-5 text-brass" />
@@ -106,9 +111,7 @@ export default function Header() {
               </div>
             </div>
 
-            {/* Neural Network Specs Grid */}
             <div className="space-y-4 text-xs">
-              
               <div className="p-4 rounded-xl bg-background/65 border border-white/5 space-y-3.5">
                 <div className="flex items-start gap-3">
                   <Server className="w-4 h-4 text-brass mt-0.5" />
@@ -153,7 +156,6 @@ export default function Header() {
                 </div>
               </div>
 
-              {/* Status bar */}
               <div className="flex items-center justify-between p-3 rounded-lg bg-coffee-deep border border-brass/10 text-[10px]">
                 <div className="flex items-center gap-1.5 text-brass font-semibold">
                   <ShieldCheck className="w-4 h-4" />
@@ -162,7 +164,6 @@ export default function Header() {
                 <span className="text-accent-green font-bold">ACTIVE</span>
               </div>
 
-              {/* Dismiss Button */}
               <div className="pt-2 border-t border-white/5 flex justify-end">
                 <button
                   onClick={() => setIsClipModalOpen(false)}
@@ -171,9 +172,89 @@ export default function Header() {
                   Dismiss
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* Qdrant Vector Database Diagnostics Modal */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsOpen(false)}
+        >
+          <div 
+            className="glass-card w-full max-w-md p-6 relative bg-background-card/95 border border-white/10 shadow-glass animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsOpen(false)}
+              className="absolute top-4 right-4 text-titanium hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2.5 border-b border-white/5 pb-3.5 mb-5">
+              <div className="bg-brass/10 p-2 rounded-lg border border-brass/30">
+                <Database className="w-5 h-5 text-brass" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white leading-none">Qdrant Diagnostics</h3>
+                <p className="text-[10px] text-titanium mt-1">Operational vector engine metrics and storage status</p>
+              </div>
             </div>
 
+            <div className="space-y-4 text-xs">
+              <div className="p-4 rounded-xl bg-background/65 border border-white/5 space-y-3.5">
+                <div className="flex items-start gap-3">
+                  <Server className="w-4 h-4 text-brass mt-0.5" />
+                  <div>
+                    <span className="text-[10px] text-titanium uppercase font-bold tracking-wider">Storage Engine</span>
+                    <p className="font-bold text-white text-sm mt-0.5">Qdrant Distributed Vector DB</p>
+                    <p className="text-[10px] text-titanium mt-0.5">Headless vector database hosting high-dimensional vision indexes.</p>
+                  </div>
+                </div>
+
+                <div className="h-px bg-white/5"></div>
+
+                <div className="flex items-start gap-3">
+                  <Sliders className="w-4 h-4 text-brass mt-0.5" />
+                  <div>
+                    <span className="text-[10px] text-titanium uppercase font-bold tracking-wider">Vector Distance Metric</span>
+                    <p className="font-bold text-white text-sm mt-0.5">Cosine Similarity</p>
+                    <p className="text-[10px] text-titanium mt-0.5">L2-normalized cosine distance checks ensuring optimal extraction match scoring.</p>
+                  </div>
+                </div>
+
+                <div className="h-px bg-white/5"></div>
+
+                <div className="flex items-start gap-3">
+                  <HardDrive className="w-4 h-4 text-brass mt-0.5" />
+                  <div>
+                    <span className="text-[10px] text-titanium uppercase font-bold tracking-wider">Active Collection</span>
+                    <p className="font-bold text-white text-sm mt-0.5 font-mono">espresso_extraction_frames</p>
+                    <p className="text-[10px] text-titanium mt-0.5">Stores the visual embeddings mapping defect features across all brews.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-coffee-deep border border-brass/10 text-[10px]">
+                <div className="flex items-center gap-1.5 text-brass font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-accent-green" />
+                  <span>Connection Status</span>
+                </div>
+                <span className="text-accent-green font-bold">CONNECTED / HEALTHY</span>
+              </div>
+
+              <div className="pt-2 border-t border-white/5 flex justify-end">
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="btn-brass py-2 px-5 text-xs font-semibold"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
