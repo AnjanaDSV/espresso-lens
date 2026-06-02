@@ -14,7 +14,8 @@ import {
   Tv,
   Check,
   Eye,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from "lucide-react";
 
 // Mock data representing database records we'd retrieve from PostgreSQL and Qdrant
@@ -53,6 +54,56 @@ const SEMANTIC_QUERIES = [
   }
 ];
 
+function getRemediationAdvice(result: any) {
+  const crema = Math.round((result.crema_quality_rating ?? 0) * 100);
+  const tips: { title: string; items: string[]; borderBg: string; textColor: string; dotBg: string }[] = [];
+
+  if (result.detected_channeling) {
+    tips.push({
+      title: "Channeling Detected",
+      borderBg: "border-accent-red/30 bg-accent-red/5",
+      textColor: "text-accent-red",
+      dotBg: "bg-accent-red/70",
+      items: [
+        "Distribute grounds more evenly before tamping",
+        "Check your tamp pressure — aim for 30 lbs even pressure",
+        "Try a WDT tool (Weiss Distribution Technique)",
+        "Grind coarser if channeling persists",
+      ],
+    });
+  }
+
+  if (result.detected_uneven_flow) {
+    tips.push({
+      title: "Uneven / Restricted Flow",
+      borderBg: "border-accent-amber/30 bg-accent-amber/5",
+      textColor: "text-accent-amber",
+      dotBg: "bg-accent-amber/70",
+      items: [
+        "Adjust grind size — finer for slow flow, coarser for fast",
+        "Check portafilter basket for blockages",
+        "Ensure consistent tamp angle",
+      ],
+    });
+  }
+
+  if (crema < 70) {
+    tips.push({
+      title: "Low Crema Coverage",
+      borderBg: "border-brass/30 bg-brass/5",
+      textColor: "text-brass",
+      dotBg: "bg-brass/70",
+      items: [
+        "Beans may be too old — use within 2–4 weeks of roast",
+        "Try a slightly finer grind",
+        "Check water temperature (target 93–96°C)",
+      ],
+    });
+  }
+
+  return { perfect: tips.length === 0, tips };
+}
+
 const SAMPLE_IMAGES = [
   { label: "Perfect Shot",       filename: "perfect_shot.jpg",      dotClass: "bg-accent-green" },
   { label: "Channeling",         filename: "channeling_severe.jpg", dotClass: "bg-accent-red"   },
@@ -74,6 +125,9 @@ export default function Dashboard() {
   const [uploadResult, setUploadResult] = useState<any | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [loadingSample, setLoadingSample] = useState<string | null>(null);
+  const [brewDoctorOpen, setBrewDoctorOpen] = useState(true);
+
+  const advice = uploadResult ? getRemediationAdvice(uploadResult) : null;
 
   const handleUpload = async () => {
     if (!uploadedFile) return;
@@ -277,6 +331,54 @@ export default function Dashboard() {
             <p className="text-[10px] text-titanium truncate" title={uploadResult.qdrant_point_id}>
               Qdrant ID: {uploadResult.qdrant_point_id}
             </p>
+          </div>
+        )}
+
+        {/* Brew Doctor — remediation guide */}
+        {advice && (
+          <div className="mt-3 rounded-xl border border-accent-green/25 bg-accent-green/5 overflow-hidden">
+            <button
+              onClick={() => setBrewDoctorOpen((o: boolean) => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-accent-green/5 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-xs font-bold text-accent-green">
+                <span>🩺</span> Brew Doctor
+                {advice.perfect && (
+                  <span className="text-[10px] font-medium text-accent-green/70 ml-0.5">— All Clear</span>
+                )}
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 text-accent-green/50 transition-transform duration-200 ${brewDoctorOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {brewDoctorOpen && (
+              <div className="px-4 pb-4 space-y-3">
+                {advice.perfect ? (
+                  <div className="p-4 rounded-lg bg-accent-green/10 border border-accent-green/20 text-center space-y-1.5">
+                    <p className="text-xl">🎉</p>
+                    <p className="text-xs font-bold text-accent-green">Your extraction looks great!</p>
+                    <p className="text-[11px] text-titanium leading-relaxed">
+                      Note your grind size and dose for next time so you can reproduce this shot.
+                    </p>
+                  </div>
+                ) : (
+                  advice.tips.map((tip, i) => (
+                    <div key={i} className={`p-3 rounded-lg border ${tip.borderBg}`}>
+                      <p className={`text-[11px] font-bold mb-2 ${tip.textColor}`}>{tip.title}</p>
+                      <ul className="space-y-1.5">
+                        {tip.items.map((item, j) => (
+                          <li key={j} className="flex items-start gap-2 text-[11px] text-titanium leading-snug">
+                            <span className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${tip.dotBg}`} />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
       </section>
