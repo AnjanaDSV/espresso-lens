@@ -70,7 +70,7 @@ def generate_mock_vision_embeddings(frame) -> List[float]:
     norm = math.sqrt(sq_sum) if sq_sum > 0 else 1.0
     normalized_vector = [x / norm for x in vector]
     
-    return normalized_vector
+    return [float(x) for x in normalized_vector]
 
 
 def analyze_extraction_frame_quality(frame):
@@ -132,7 +132,10 @@ def analyze_extraction_frame_quality(frame):
     # Score is high when there's rich brown/amber colors (ratio > 0.4)
     crema_quality_rating = min(1.0, max(0.1, brown_ratio * 2.0))
     
-    return detected_channeling, detected_uneven_flow, crema_quality_rating
+    # cv2 operations return numpy scalars; convert to native Python types before
+    # any DB insert, otherwise psycopg2 sees e.g. np.bool_ / np.float64 and
+    # raises InvalidSchemaName: schema "np" does not exist.
+    return bool(detected_channeling), bool(detected_uneven_flow), float(crema_quality_rating)
 
 
 def process_image_bytes(
