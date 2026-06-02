@@ -17,6 +17,22 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 
 
+def migrate_db() -> None:
+    """Idempotently add new columns to existing tables (ALTER TABLE IF NOT EXISTS).
+    Safe to run on every startup — PostgreSQL skips columns that already exist.
+    """
+    from sqlalchemy import text
+    stmts = [
+        "ALTER TABLE extractionframe ADD COLUMN IF NOT EXISTS channeling_severity VARCHAR DEFAULT 'None'",
+        "ALTER TABLE extractionframe ADD COLUMN IF NOT EXISTS flow_status VARCHAR DEFAULT 'Balanced'",
+        "ALTER TABLE extractionframe ADD COLUMN IF NOT EXISTS detection_confidence FLOAT DEFAULT 0.5",
+    ]
+    with engine.connect() as conn:
+        for stmt in stmts:
+            conn.execute(text(stmt))
+        conn.commit()
+
+
 def seed_db() -> None:
     """Insert sample bean profiles if the table is empty."""
     from app.models.bean import Bean

@@ -13,8 +13,13 @@ class ExtractionFrameBase(SQLModel):
     # Detected extraction metrics from computer vision analysis
     detected_channeling: bool = Field(default=False)
     detected_uneven_flow: bool = Field(default=False)
-    crema_quality_rating: float = Field(default=0.0)  # Quality score 0.0 to 1.0
-    
+    crema_quality_rating: float = Field(default=0.0)
+
+    # Enhanced detection fields (added via migrate_db on startup)
+    channeling_severity: str = Field(default="None")      # "None" | "Mild" | "Detected"
+    flow_status: str = Field(default="Balanced")          # "Balanced" | "Uneven"
+    detection_confidence: float = Field(default=0.5)      # 0.0–1.0
+
     notes: Optional[str] = None
 
 

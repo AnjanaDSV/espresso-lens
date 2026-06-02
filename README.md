@@ -4,6 +4,8 @@ EspressoLens is an intelligent espresso extraction diagnostic suite. It analyzes
 
 Built for home baristas and commercial operators who want data-driven feedback on their extraction technique.
 
+![EspressoLens Dashboard](docs/screenshots/ui-demo.png)
+
 ---
 
 ## Features
@@ -11,6 +13,11 @@ Built for home baristas and commercial operators who want data-driven feedback o
 - **Video & Image Upload** — Drag-and-drop upload of espresso shot recordings or stills
 - **Frame-by-Frame Analysis** — OpenCV-powered processing extracts frames and computes visual metrics per frame
 - **Defect Detection** — Identifies channeling, uneven flow patterns, and crema quality rating (0–1 scale)
+- **Source Tracking** — After analysis, a subtitle shows exactly what was analyzed: the filename for user uploads (e.g. `my-espresso.jpg`) or the sample name for demo images (e.g. `Perfect Shot (sample)`)
+- **Plain English Interpretation** — A single-sentence summary below the metrics explains the overall result in plain language (e.g. *"Channeling issue detected — check your tamp and distribution."*)
+- **Confidence Score** — AI certainty rating (0–100%) for each analysis, shown with a hover tooltip: *"How certain the AI is about this reading"*
+- **Brew Doctor** — Collapsible remediation card that surfaces targeted, actionable advice for every detected issue; shows a multi-card layout when multiple problems are found simultaneously
+- **5 Built-in Demo Samples** — One-click sample images covering: Perfect Shot, Channeling, Underextracted, Overextracted, and Uneven Flow — no upload required to explore the full pipeline
 - **Vector Embeddings** — Each analyzed frame is encoded into a 512-dimensional L2-normalized embedding and indexed in Qdrant
 - **Semantic Search** — Query across extraction history by visual similarity (e.g. "strong channeling", "tiger-stripe crema")
 - **Bean Database** — Catalog of coffee bean profiles with roast level, origin, tasting notes, and target parameters
@@ -187,13 +194,16 @@ Click any button in the "Load Sample Image / Demo" row, then hit **Analyze with 
 
 ### Diagnostic Metrics
 
-After analysis, three metrics are returned for each uploaded frame:
+After analysis, four metrics are returned for each uploaded frame:
 
 | Metric | What It Measures | Values |
 |---|---|---|
-| **Channeling** | Whether water found shortcuts through the coffee puck instead of flowing evenly | `None` / `Detected` |
-| **Flow** | How symmetrically and evenly water moved through the grounds | `Balanced` / `Uneven` |
+| **Channeling** | Whether water found shortcuts through the coffee puck instead of flowing evenly | `None` / `Mild` / `Detected` |
+| **Flow** | How symmetrically and evenly water moved through the grounds | `Balanced` / `Uneven` / `Restricted` |
 | **Crema** | Percentage (0–100%) of the frame's surface covered by golden crema foam — higher is better | `0%` → `100%` |
+| **Confidence** | How certain the AI is about this reading — hover the card in the UI for the tooltip | `0%` → `100%` |
+
+Below the metrics, a **plain English interpretation** summarizes the overall result in one sentence. Above the card, a **source label** confirms what was analyzed (filename or sample name).
 
 ### Expected Results Per Sample
 
@@ -225,14 +235,15 @@ python scripts/generate_test_images.py
 
 ### Remediation Guide (Brew Doctor)
 
-After every analysis the **Brew Doctor** card appears automatically below the result. It reads the three diagnostic flags and surfaces targeted advice for each detected issue. The card is collapsible and defaults to open.
+After every analysis the **Brew Doctor** card appears automatically below the result. It reads all four diagnostic flags and surfaces a separate actionable tip card for each detected issue. When multiple problems are found, all relevant cards are shown simultaneously. The section is collapsible and defaults to open.
 
 | Condition | Trigger | Actionable Tips |
 |---|---|---|
-| **Channeling Detected** | `detected_channeling = true` | Distribute grounds evenly before tamping; check tamp pressure (aim for 30 lbs); use a WDT tool (Weiss Distribution Technique); try a coarser grind |
-| **Uneven / Restricted Flow** | `detected_uneven_flow = true` | Adjust grind size — finer for slow flow, coarser for fast; check portafilter basket for blockages; ensure a level, consistent tamp angle |
+| **Channeling Detected** | `channeling_severity = "Detected"` | Distribute grounds evenly before tamping; check tamp pressure (aim for 30 lbs); use a WDT tool (Weiss Distribution Technique); try a coarser grind |
+| **Mild Channeling** | `channeling_severity = "Mild"` | Minor puck unevenness — redistribution before tamping will help; check tamp levelness; try a slightly coarser grind |
+| **Uneven / Restricted Flow** | `flow_status = "Uneven"` or `"Restricted"` | Adjust grind size — finer for slow flow, coarser for fast; check portafilter basket for blockages; ensure a level, consistent tamp angle |
 | **Low Crema Coverage** | `crema_quality_rating < 0.70` | Use fresher beans (within 2–4 weeks of roast date); try a slightly finer grind; verify water temperature is 93–96°C |
-| **Perfect Shot** | All three checks pass | Celebration message — note your grind size and dose so you can reproduce the result |
+| **Perfect Shot** | All checks pass | Celebration message — note your grind size and dose so you can reproduce the result |
 
 ---
 
