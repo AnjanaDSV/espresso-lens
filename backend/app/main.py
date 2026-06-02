@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.core.config import settings
-from app.core.database import init_db, engine
+from app.core.database import init_db, seed_db, engine
 from app.core.qdrant import init_qdrant_collections, qdrant_client
 from app.api.v1.api import api_router
 
@@ -18,6 +18,7 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
         print("SQLModel tables created successfully.")
+        seed_db()
     except Exception as db_err:
         print(f"Warning: Failed to initialize PostgreSQL tables: {db_err}")
 

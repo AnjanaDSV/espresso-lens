@@ -169,6 +169,62 @@ WATCHPACK_POLLING=true
 
 ---
 
+## Demo Guide
+
+The fastest way to explore EspressoLens is through the **Load Sample Image** buttons on the dashboard. Each synthetic image represents a distinct real-world extraction scenario.
+
+### Sample Images
+
+Click any button in the "Load Sample Image / Demo" row, then hit **Analyze with AI** to run the full pipeline on that image.
+
+| Button | Shot Type | What It Represents |
+|---|---|---|
+| **Perfect Shot** | Ideal extraction | Even golden crema, balanced radial flow, no defects detected |
+| **Channeling** | Severe defect | Water channeled through weak spots in the puck, creating dark streaks and uneven extraction |
+| **Underextracted** | Too-fast shot | Pale blonde color, thin crema, under-developed flavors — shot ran too fast |
+| **Overextracted** | Too-slow shot | Near-black burnt appearance, heavy bitterness — shot ran too slow with excessive contact time |
+| **Uneven Flow** | Asymmetric flow | One side of the basket extracting much darker than the other, indicating uneven puck preparation |
+
+### Diagnostic Metrics
+
+After analysis, three metrics are returned for each uploaded frame:
+
+| Metric | What It Measures | Values |
+|---|---|---|
+| **Channeling** | Whether water found shortcuts through the coffee puck instead of flowing evenly | `None` / `Detected` |
+| **Flow** | How symmetrically and evenly water moved through the grounds | `Balanced` / `Uneven` |
+| **Crema** | Percentage (0–100%) of the frame's surface covered by golden crema foam — higher is better | `0%` → `100%` |
+
+### Expected Results Per Sample
+
+| Sample | Channeling | Flow | Crema |
+|---|---|---|---|
+| `perfect_shot.jpg` | None | Balanced | ~85–95% |
+| `channeling_severe.jpg` | Detected | Uneven | ~40–55% |
+| `underextracted.jpg` | None | Balanced | ~20–35% |
+| `overextracted.jpg` | None | Balanced | ~30–45% |
+| `uneven_flow.jpg` | None | Uneven | ~50–65% |
+
+### What Happens Under the Hood
+
+When you click **Analyze with AI**, the following pipeline runs:
+
+1. **Upload** — The image is POSTed to `POST /api/v1/extractions/{id}/upload-file`
+2. **OpenCV processing** — The frame is decoded in memory; color statistics and quadrant analysis are computed across the image
+3. **Embedding generation** — A 512-dimensional L2-normalized vector is derived from the frame's visual features, mimicking the output of a CLIP ViT-B/32 vision encoder
+4. **Defect detection** — Color distribution, brightness variance, and quadrant asymmetry are evaluated against thresholds to flag channeling and uneven flow
+5. **Qdrant indexing** — The embedding is stored in the `espresso_extraction_frames` collection with cosine distance; a UUID point ID is returned as proof of indexing
+6. **Result display** — Channeling flag, flow symmetry flag, crema coverage rating, and Qdrant point ID are rendered back in the dashboard
+
+To generate fresh sample images locally:
+
+```bash
+pip install Pillow numpy
+python scripts/generate_test_images.py
+```
+
+---
+
 ## License
 
 MIT

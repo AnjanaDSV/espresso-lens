@@ -53,6 +53,14 @@ const SEMANTIC_QUERIES = [
   }
 ];
 
+const SAMPLE_IMAGES = [
+  { label: "Perfect Shot",       filename: "perfect_shot.jpg",      dotClass: "bg-accent-green" },
+  { label: "Channeling",         filename: "channeling_severe.jpg", dotClass: "bg-accent-red"   },
+  { label: "Underextracted",     filename: "underextracted.jpg",    dotClass: "bg-accent-amber" },
+  { label: "Overextracted",      filename: "overextracted.jpg",     dotClass: "bg-coffee"       },
+  { label: "Uneven Flow",        filename: "uneven_flow.jpg",       dotClass: "bg-brass"        },
+];
+
 export default function Dashboard() {
   const [selectedBean, setSelectedBean] = useState(MOCK_BEANS[0]);
   const [selectedExtraction, setSelectedExtraction] = useState(MOCK_EXTRACTIONS[0]);
@@ -65,6 +73,7 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [loadingSample, setLoadingSample] = useState<string | null>(null);
 
   const handleUpload = async () => {
     if (!uploadedFile) return;
@@ -102,6 +111,22 @@ export default function Dashboard() {
       setVectorResults(SEMANTIC_QUERIES[index].results);
       setIsSearching(false);
     }, 600);
+  };
+
+  const loadSampleImage = async (sample: typeof SAMPLE_IMAGES[0]) => {
+    setLoadingSample(sample.filename);
+    setUploadError(null);
+    setUploadResult(null);
+    try {
+      const res = await fetch(`/samples/${sample.filename}`);
+      if (!res.ok) throw new Error("Sample not found — run scripts/generate_test_images.py first");
+      const blob = await res.blob();
+      setUploadedFile(new File([blob], sample.filename, { type: "image/jpeg" }));
+    } catch (e: any) {
+      setUploadError(e.message);
+    } finally {
+      setLoadingSample(null);
+    }
   };
 
   const handleCustomVectorSearch = (e: React.FormEvent) => {
@@ -184,6 +209,33 @@ export default function Dashboard() {
                 Uploading & embedding…
               </span>
             )}
+          </div>
+        </div>
+
+        {/* Sample image quick-load */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-[10px] text-titanium uppercase font-bold tracking-wider">Load Sample Image</span>
+            <span className="text-[10px] text-brass border border-brass/20 px-1.5 py-0.5 rounded bg-brass/5">Demo</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {SAMPLE_IMAGES.map((sample) => (
+              <button
+                key={sample.filename}
+                onClick={() => loadSampleImage(sample)}
+                disabled={loadingSample !== null}
+                className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg border transition-all duration-200 disabled:opacity-50 disabled:cursor-wait ${
+                  loadingSample === sample.filename
+                    ? "border-brass/40 text-brass bg-brass/5"
+                    : "border-white/10 text-titanium hover:text-white hover:border-white/25 bg-background/60"
+                }`}
+              >
+                {loadingSample === sample.filename
+                  ? <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                  : <span className={`w-2 h-2 rounded-full flex-shrink-0 ${sample.dotClass}`} />}
+                {sample.label}
+              </button>
+            ))}
           </div>
         </div>
 
