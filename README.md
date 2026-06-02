@@ -223,6 +223,17 @@ pip install Pillow numpy
 python scripts/generate_test_images.py
 ```
 
+### Remediation Guide (Brew Doctor)
+
+After every analysis the **Brew Doctor** card appears automatically below the result. It reads the three diagnostic flags and surfaces targeted advice for each detected issue. The card is collapsible and defaults to open.
+
+| Condition | Trigger | Actionable Tips |
+|---|---|---|
+| **Channeling Detected** | `detected_channeling = true` | Distribute grounds evenly before tamping; check tamp pressure (aim for 30 lbs); use a WDT tool (Weiss Distribution Technique); try a coarser grind |
+| **Uneven / Restricted Flow** | `detected_uneven_flow = true` | Adjust grind size — finer for slow flow, coarser for fast; check portafilter basket for blockages; ensure a level, consistent tamp angle |
+| **Low Crema Coverage** | `crema_quality_rating < 0.70` | Use fresher beans (within 2–4 weeks of roast date); try a slightly finer grind; verify water temperature is 93–96°C |
+| **Perfect Shot** | All three checks pass | Celebration message — note your grind size and dose so you can reproduce the result |
+
 ---
 
 ## License
