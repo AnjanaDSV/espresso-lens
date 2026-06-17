@@ -1,6 +1,6 @@
 # EspressoLens
 
-EspressoLens is an intelligent espresso extraction diagnostic suite. It analyzes espresso shot videos and images frame-by-frame using computer vision and vector embeddings to detect shot defects — channeling, uneven flow, and crema quality issues — and enables semantic search across historical brews.
+EspressoLens is an intelligent espresso extraction diagnostic suite. It analyzes espresso shot videos and images frame-by-frame using computer vision and vector embeddings to detect shot  defects channeling, uneven flow, and crema quality issues and enables semantic search across historical brews.
 
 Built for home baristas and commercial operators who want data-driven feedback on their extraction technique.
 
